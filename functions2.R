@@ -20,7 +20,6 @@ load('Termination.RData')
 
 ############## Setter method for age information ###############
  age_information <<- function(i_ea,retire) {
-
   ea <<- i_ea # entry age of members,  multiple entry ages are not introduced yet
   retire <<- retire  # retirement age
   max_age <<- 100 # maximum age limit
@@ -35,7 +34,7 @@ load('Termination.RData')
 }
 
 
-age_grp_labels<<- function(i_ea,retire,age_limit){
+age_grp_labels<<- function(i_ea,age_limit){
   start_limit<-i_ea
   for(i in i_ea:age_limit-1){
     if(i%%5==0)
@@ -76,7 +75,7 @@ generate_pop<-function(ea,retire,pop_type,pop_size,median){
 ############## Generate retirees population ############
 population_retirees<-function(ea,retire,mort,population){
   pop_freq<-table(population)
-  pop2<-ceiling(pop_freq[length(pop_freq)]*cumprod(1-get_mort(ea,retire,mort)[(retire-ea+1):(max_age-ea+1)]))
+  pop2<-ceiling(pop_freq[length(pop_freq)]*cumprod(1-get_mort(ea,mort)[(retire-ea+1):(max_age-ea+1)]))
   pop3<-0
   j<-retire+1
   for(i in pop2){
@@ -108,28 +107,31 @@ get_exp_sal <- function(ea,retire,sgr) {
 }
 
 ############## Accumlated Salary ############
-get_acc_sal <- function(ea,retire,a_sgr) {
-  act_sal <- get_act_sal(ea,retire,a_sgr)
+get_acc_sal <- function(ea,a_sgr) {
+  act_sal <- get_act_sal(ea,a_sgr)
   acc_sal <- c(cumsum(act_sal)) #acculumated salary at age x
   return(acc_sal)
 }
 
 ############## Expected Salary at retirement ############
-get_exp_sal_r <- function(ea,retire,a_sgr,sgr) {
-  act_sal <- get_act_sal(ea,retire,a_sgr)
-  exp_sal_r <- act_sal * ((1 + sgr) ^ rx) # expected salary at age r in year x
-  return(exp_sal_r)
+get_exp_sal_r <- function(ea,a_sgr,sgr) {
+  act_sal <- get_act_sal(ea,a_sgr)
+  exp_sal_r <- numeric(length(act_sal))
+  for (i in 1:length(act_sal)) {
+    exp_sal_r[i] <-
+      (act_sal[i] * ((1 + sgr) ^ rx[i])) # expected salary at age r in year x
+  }
+  return(na.omit(exp_sal_r))
 }
 
 ##############  Salary for constant inflation rate and multiple entry ages ############
-get_sal_vector_ea <- function(ea,retire,sal,inflation,sgr){
+get_sal_vector_ea <- function(ea,sal,inflation,sgr){
   return((((1 + (inflation / 100)) ^ yos_xy)/(1 + ((sgr) / 100)) ^ yos_xy)*sal)
 }
 
 ############## Current Salary for constant inflation rate and multiple entry ages ############
-get_sal_65 <- function(ea,retire,sal,inflation,sgr){
-  return(((1 + ((sgr) / 100)) ^ yos_xy)/((1 + (inflation / 100)) ^ yos_xy)*sal)
-  #return(sum((((1 + sgr/100) ^ (seq(ea:ca)-1))/((1 + (inflation / 100)) ^ (seq(ea:ca)-1)))*sal))
+get_sal_ca <- function(ea,ca,sal,inflation,sgr){
+  return(sum((((1 + sgr/100) ^ (seq(ea:ca)-1))/((1 + (inflation / 100)) ^ (seq(ea:ca)-1)))*sal))
 }
 
 ###################################################################################################
@@ -137,12 +139,7 @@ get_sal_65 <- function(ea,retire,sal,inflation,sgr){
 ###################################################################################################
 get_mort <- function(ea,retire,mort) {
   age_information(ea,retire)
-  annuitant_mort<-(mort+1)
-  min_mort_age<<-18
-  max_mort_age<<-120
-  mortality_tab<-c(mort_tables[[mort]][(ea-min_mort_age+1):(retire-min_mort_age+1)],
-                   mort_tables[[(annuitant_mort)]][(retire-min_mort_age+2):(max_age-min_mort_age+1)])
-  return(na.omit(mortality_tab))
+  return(na.omit(mort_tables[[mort]]))
 }
 
 ##################################################################################################
@@ -152,27 +149,27 @@ get_mort <- function(ea,retire,mort) {
 ######### Survival probablity from x to x+1 ##################
 get_xpmx <- function(ea,retire,mort) {
   age_information(ea,retire)
-  xpmx <- (1 - get_mort(ea,retire,mort))
+  
+  xpmx <- (1 - get_mort(ea,mort))
   return(xpmx)
 }
 
 ############# Survival probablity from x to 65 #################
-get_rpmx <- function(ea,retire,mort) {
-  xpmx <- get_xpmx(ea,retire,mort)
-  rpmx <- c(rev(cumprod(rev(xpmx[1:(length(age) - 1)]))),1)
+get_rpmx <- function(ea,mort) {
+  xpmx <- get_xpmx(ea,mort)
+  rpmx <- c(rev(cumprod(rev(xpmx[(ea-min_ea+1):(length(age)+ (ea-min_ea) - 1)]))),1)
   return(rpmx)
 }
 
 ############# Survival probablity from 65 to certain age (100 max)#########
-get_xpmr <- function(ea,retire,mort) {
-  xpmx <- get_xpmx(ea,retire,mort)
+get_xpmr <- function(ea,mort) {
+  xpmx <- get_xpmx(ea,mort)
   
-  rpmx <- get_rpmx(ea,retire,mort)
-  
-  xpmr <- numeric()
-  xpmr[1] <- xpmx[length(age)] * rpmx[length(rpmx)]
+  rpmx <- get_rpmx(ea,mort)
+  xpmr <- numeric((length(xpmx))-length(age) + (ea-min_ea))
+  xpmr[1] <- xpmx[length(age)+ (ea-min_ea)] * rpmx[length(rpmx)]
   for (i in 1:(max_age - retire - 1))
-    xpmr[i + 1] = xpmx[length(age) + i] * xpmr[i]
+    xpmr[i + 1] = xpmx[length(age)+ (ea-min_ea) + i] * xpmr[i]
   
   return(xpmr[xpmr!=0])
 }
@@ -182,42 +179,54 @@ get_xpmr <- function(ea,retire,mort) {
 #############################################################################################
 
 ################ Accumulated benefits #############################
-get_acc_benefits <- function(ea,retire,a_sgr,afc,bf) {
-  acc_sal <- get_acc_sal(ea,retire,a_sgr)
+get_acc_benefits <- function(ea,a_sgr,afc,bf) {
+  acc_sal <- get_acc_sal(ea,a_sgr)
   after_afc<-(acc_sal[(afc+2):length(acc_sal)] - acc_sal[2:(length(age)-afc)]) * yos_xy[(afc+2):length(yos_xy)]*bf/ afc
+  
   acc_benefits <-
         c(0,(acc_sal[2:(afc+1)] - acc_sal[1]) * bf,after_afc)
   return(acc_benefits)  
 }
 
 ############################ Accumlated benefits till retirement #############################
-get_acc_benefit_r <- function(ea,retire,a_sgr,sgr,afc,bf) {
-  if(afc>1)
-    exp_sal_r <-get_exp_sal_r(ea,retire,a_sgr,sgr)[1:(length(age) - afc)]
-  else
-    exp_sal_r <-get_exp_sal_r(ea,retire,a_sgr,sgr)
-  
-  exp_sal <- get_exp_sal(ea,retire,sgr)
-  act_sal <- get_act_sal(ea,retire,a_sgr)
-  index_upper <- length(age) - afc
-  index_lower <- length(age)
-  acc_ben_avg<-numeric()
-  acc_benefit_r <- exp_sal_r * (sum((1 + sgr) ^ seq(0,(-afc + 1))) / afc) * bf * (length(age) - 1)
-  
+get_acc_benefit_r <- function(ea,a_sgr,sgr,afc,bf) {
   if(afc>1){
-    for (i in seq((index_upper+1):index_lower)-1)
-      acc_ben_avg<-c(acc_ben_avg,mean(na.omit(c(act_sal[(index_upper+1):(index_upper+1+i)],exp_sal[(index_upper+i+2):index_lower])))*bf*(length(age) - 1))
-    acc_ben_avg[length(acc_ben_avg)]<-mean(act_sal[(index_upper+1):index_lower])*bf*(length(age) - 1)
+  exp_sal_r <-
+    as.numeric(get_exp_sal_r(ea,a_sgr,sgr))[1:(length(age) - afc)]
   }
-  acc_benefit_r <- c(acc_benefit_r,acc_ben_avg)
+  else{
+    exp_sal_r <-
+      as.numeric(get_exp_sal_r(ea,a_sgr,sgr))
+  }
+  # accumulated benefit at age r
+  exp_sal <- get_exp_sal(ea,sgr)
   
+  act_sal <- get_act_sal(ea,a_sgr)
+  index_upper = length(age) - afc
+  index_lower = length(age)
+  acc_benefit_r <-
+    (exp_sal_r * (sum((1 + sgr) ^ seq(0,(
+      -afc + 1
+    )))) / afc) * bf * (length(age) - 1)
+  if(afc>1){
+  for (i in index_upper:index_lower)
+    acc_benefit_r1 <- na.omit(cumsum(act_sal[index_upper:i + 1]))
+  acc_benefit_r2 <-
+    rev(cumsum(rev(na.omit(exp_sal[index_upper + 1:index_lower]))))
+  acc_benefit_r3 <-
+    acc_benefit_r1[1:(afc - 1)] + acc_benefit_r2[2:afc]
+  acc_benefit_r3 <-
+    c((acc_benefit_r3 / afc) * bf * (length(age) - 1),acc_benefit_r1[afc] * bf *
+        (length(age) - 1) / afc)
+  acc_benefit_r <- c(acc_benefit_r,acc_benefit_r3)
+  }
   return(acc_benefit_r)
 }
 
 ############################ Accumulated benefit at 65 #############################
-get_acc_benefit_65 <- function(ea,retire,a_sgr,sgr,afc,bf) {
+get_acc_benefit_65 <- function(ea,a_sgr,sgr,afc,bf) {
   acc_benefit_65 <-
-    as.numeric(get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf)[length(get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf))])
+    as.numeric(get_acc_benefit_r(ea,a_sgr,sgr,afc,bf)[length(get_acc_benefit_r(ea,a_sgr,sgr,afc,bf))])
   return(acc_benefit_65)
 }
 
@@ -233,8 +242,8 @@ get_vrx <- function(ea,retire,i) {
 }
 
 ########### discount factor from x to r & r to 100 #########################
-get_vxr <- function(ea,retire,i) {
-  vxr <- c(get_vrx(ea,retire,i),c(1 / ((1 + i) ^ (seq(
+get_vxr <- function(ea,i) {
+  vxr <- c(get_vrx(ea,i),c(1 / ((1 + i) ^ (seq(
     (retire + 1):max_age
   )))))
   return(vxr)
@@ -247,39 +256,26 @@ get_vxr <- function(ea,retire,i) {
 ####################### termination rates ##########################
 get_qxt <- function(ea,retire) {
   age_information(ea,retire)
-  min_qxt_age<<-18
-  term_rate<-numeric()
-  for(i in yos_xy){
-    if(yos_xy[i+1]<2)
-      term_rate<-c(term_rate,term_rate_xl$`Service<2`[ea-min_qxt_age+1+i]/100)
-    else if(yos_xy[i+1]>=2 && yos_xy[i+1]<=4)
-      term_rate<-c(term_rate,term_rate_xl$`Service=2,3,4`[ea-min_qxt_age+1+i]/100)
-    else if(yos_xy[i+1]>=5 && yos_xy[i+1]<=9)
-      term_rate<-c(term_rate,term_rate_xl$`Service=5-9`[ea-min_qxt_age+1+i]/100)
-    else
-      term_rate<-c(term_rate,term_rate_xl$`Service>=10`[ea-min_qxt_age+1+i]/100)
-  }
-  term_rate[is.na(term_rate)]<-0
-  #term_rate_xl <- term_rate_xl[7,]
+  #qxt<-term_rates$`30`[11:length(term_rates$`30`)]
+  qxt <- term_rate_xl$`Termination rate` / 100
   # rate of termination
-  return(term_rate)
+  return(qxt[(ea-30+1):length(qxt)])
   
 }
 
 ######### Probablity to continue to next year ###############
 
-get_xpxT <- function(ea,retire,mort) {
-  xpmx <- c(get_xpmx(ea,retire,mort)[1:length(age)])
-  xpxT <- xpmx * (1 - get_qxt(ea,retire))
+get_xpxT <- function(ea,mort) {
+  xpmx <- c(get_xpmx(ea,mort)[1:length(age)])
+  xpxT <- xpmx * (1 - get_qxt(ea))
   return(xpxT)
 }
 
 ########## Probablity to continue to 65 #####################
 
-get_rxpxT <- function(ea,retire,mort) {
-  #xpxT<-get_xpxT(ea,retire,mort)
-  rxpxT<-get_rpmx(ea,retire,mort)* (1 - get_qxt(ea,retire))
-  #rxpxT <- rev(cumprod(rev(xpxT))) to continue and survive
+get_rxpxT <- function(ea,mort) {
+  qxt <- get_qxt(ea)
+  rxpxT <- get_rpmx(ea,mort) * (1 - qxt)
   return(rxpxT)
 }
 
@@ -287,26 +283,35 @@ get_rxpxT <- function(ea,retire,mort) {
 ############################### Annuity functions ####################################################
 ######################################################################################################
 
-############ Straight Life Annuity factor for 1 dollar ##############
-get_ar <- function(ea,retire,i,cola,mort) {
+############ Straight Life Annuity ##############
+get_ar <- function(ea,i,cola,mort) {
   ar <-
-    sum(
-      get_vxr(ea,retire,i)[(length(get_vrx(ea,retire,i))):length(get_vxr(ea,retire,i))] * 
-    c(get_rpmx(ea,retire,mort)[length(get_rpmx(ea,retire,mort))],na.omit(get_xpmr(ea,retire,mort))) *
-      ((1 + cola) ^ yos_r_max))
+    sum(get_vxr(ea,i)[length(get_vrx(ea,i)):length(get_vxr(ea,i))] * 
+          c(get_rpmx(ea,mort)[length(get_rpmx(ea,mort))],na.omit(get_xpmr(ea,mort))) *
+          ((1 + cola) ^ yos_r_max))
 
     return(ar)
 }
 
+############ Present value of Annuity ##############
+get_ar <- function(ea,i,cola,mort) {
+  ar <-
+    sum(get_vxr(ea,i)[length(get_vrx(ea,i)):length(get_vxr(ea,i))] * 
+          c(get_rpmx(ea,mort)[length(get_rpmx(ea,mort))],na.omit(get_xpmr(ea,mort))) *
+          ((1 + cola) ^ yos_r_max))
+  
+  return(ar)
+}
+
 ############ period certain Annuity ##############
-get_am <- function(ea,retire,i,amortization) {
-  vxr <- get_vxr(ea,retire,i)
+get_am <- function(ea,i,amortization) {
+  vxr <- get_vxr(ea,i)
   am <- sum(vxr[1:amortization - 1])
   return(sum(am))
 }
 
 ############# Temporary Annuity for a certain entry age ##############
-get_tla <- function(ea,retire,i,sgr,mort,a)
+get_tla <- function(ea,i,sgr,mort,a)
   # tla for certain entry age
 {
   age <- age[1:(length(age) - 1)]
@@ -314,7 +319,7 @@ get_tla <- function(ea,retire,i,sgr,mort,a)
   v <- numeric(length(age))
   sts <- numeric(length(age))
   np <- v <- sts <- c(rep.int(0,(length(age))))
-  xpmx <- get_xpmx(ea,retire,mort)[1:length(age)]
+  xpmx <- get_xpmx(ea,mort)[1:length(age)]
   
   if (a >= ea) {
     np[a - ea + 1] <- v[a - ea + 1] <- sts[a - ea + 1] <- 1
@@ -330,37 +335,22 @@ get_tla <- function(ea,retire,i,sgr,mort,a)
 }
 
 ############## Temporary Annuity ##################
-get_tla_t <- function(ea,retire,i,sgr,mort) {
-  age_information(ea,retire)
+get_tla_t <- function(ea,i,sgr,mort) {
   tla_t <- as.numeric(length(age))
   for (k in 1:(length(age) - 1))
-    tla_t[k] <- c(get_tla(ea,retire,i,sgr,mort,age[k]))
+    tla_t[k] <- c(get_tla(ea,i,sgr,mort,age[k]))
   return(tla_t)
 }
 
 
 ########################  Annuity after r ##############################
-get_a_after_r <- function(ea,retire,i,cola,mort) {
+get_a_after_r <- function(ea,i,cola,mort) {
   after_ar <-
-  rev(cumsum(rev(get_vxr(ea,retire,i)[length(get_vrx(ea,retire,i)):length(get_vxr(ea,retire,i))] * 
-        c(get_rpmx(ea,retire,mort)[length(get_rpmx(ea,retire,mort))],get_xpmr(ea,retire,mort)) *
+  rev(cumsum(rev(get_vxr(ea,i)[length(get_vrx(ea,i)):length(get_vxr(ea,i))] * 
+        c(get_rpmx(ea,mort)[length(get_rpmx(ea,mort))],get_xpmr(ea,mort)) *
         ((1 + cola) ^ yos_r_max))))
   
   return(after_ar[2:length(after_ar)])
-}
-
-###################### Replacement rate ##########################
-get_replacement_rate <- function(ea,retire,a_sgr,sgr,afc,bf) {
-  acc_benefit_r<-get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf)
-  act_sal <- get_act_sal(ea,retire,a_sgr)
-  repl_rate<- round((acc_benefit_r[length(acc_benefit_r)]/act_sal[length(act_sal)])*100,2)
-  return(repl_rate)
-}
-
-################### Retirement Annuity ###########################
-get_retirement_annuity<-function(ea,retire,a_sgr,sgr,afc,bf){
-  acc_benefit<-get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf)
-  return(round(acc_benefit[length(acc_benefit)],3))
 }
 
 #############################################################################################
@@ -368,25 +358,26 @@ get_retirement_annuity<-function(ea,retire,a_sgr,sgr,afc,bf){
 #############################################################################################
 
 #################### PVFB from x to r ###################################
-get_rPVFBx <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort) {
+get_rPVFBx <- function(ea,i,a_sgr,sgr,cola,afc,bf,mort) {
   rPVFBx <-
-      get_vrx(ea,retire,i) * get_xpxT(ea,retire,mort) * get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf) * get_ar(ea,retire,i,cola,mort)
+    get_vrx(ea,i) * get_rxpxT(ea,mort) * get_acc_benefit_r(ea,a_sgr,sgr,afc,bf) * get_ar(ea,i,cola,mort)
+  
   return(rPVFBx)
 }
 
 
-############################ Present value Future benefits after retirement  ############################
-get_rPVFBx_after_r <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort) {
-  a_after_r <- get_a_after_r(ea,retire,i,cola,mort)
-  rPVFBx <- get_acc_benefit_65(ea,retire,a_sgr,sgr,afc,bf) * a_after_r
+############################ Future benefits after retirement  ############################
+get_xPVFBr <- function(ea,i,a_sgr,sgr,cola,afc,bf,mort) {
+  a_after_r <- get_a_after_r(ea,i,cola,mort)
+  xPVFBr <- get_acc_benefit_65(ea,a_sgr,sgr,afc,bf) * a_after_r
   
-  return(rPVFBx)
+  return(xPVFBr)
 }
 
 ##################################################################################
 ######################### grading function #######################################
 ##################################################################################
-get_gxv <- function(ea,retire,vesting) {
+get_gxv <- function(ea,vesting) {
   gxv <- c(rep(0,vesting), rep(100,(length(age) - vesting)))
   return(gxv)
 }
@@ -394,34 +385,34 @@ get_gxv <- function(ea,retire,vesting) {
 ##################################################################################
 ################################ Vesting cost ####################################
 ##################################################################################
-get_vesting_cost <- function(ea,retire,i,a_sgr,cola,afc,bf,mort,vesting) {
-  bx <- get_acc_benefits(ea,retire,a_sgr,afc,bf)
-  vc <- (get_gxv(ea,retire,vesting) / 100) * bx * get_ar(ea,retire,i,cola,mort)
+get_vesting_cost <- function(ea,i,a_sgr,cola,afc,bf,mort,vesting) {
+  bx <- get_acc_benefits(ea,a_sgr,afc,bf)
+  vc <- (get_gxv(ea,vesting) / 100) * bx * get_ar(ea,i,cola,mort)
   return(vc)
 }
 
 ###############################################################################
 ################################ term cost ####################################
 ###############################################################################
-get_term_cost <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting) {
-  rpmx <- get_rpmx(ea,retire,mort)
+get_term_cost <- function(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting) {
+  rpmx <- get_rpmx(ea,mort)
   rpmx <- c(rpmx[2:length(rpmx)],1)
-  vc <- get_vesting_cost(ea,retire,i,a_sgr,cola,afc,bf,mort,vesting)
-
-  tc <- vc * get_qxt(ea,retire) * rpmx * get_vrx(ea,retire,i)
+  vc <- get_vesting_cost(ea,i,a_sgr,cola,afc,bf,mort,vesting)
+  tc <- vc * get_qxt(ea) * rpmx * get_vrx(ea,i)
   return(tc)
 }
 
 ###############################################################################
 ############################ PVTC #############################################
 ###############################################################################
-get_PVTC <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting,a){
+get_PVTC <- function(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting,a)
+{
   age <- age[1:(length(age) - 1)]
-  tc <- get_term_cost(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
+  tc <- get_term_cost(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
   np <- numeric(length(age))
   v <- numeric(length(age))
   np <- v <- c(rep.int(0,(length(age))))
-  xpmx <- get_xpmx(ea,retire,mort)[1:length(age)]
+  xpmx <- get_xpmx(ea,mort)[1:length(age)]
   if (a >= ea) {
     np[a - ea + 1] <- v[a - ea + 1] <- 1
     for (j in (a - ea + 1):(length(age))) {
@@ -433,12 +424,13 @@ get_PVTC <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting,a){
   return(pvtc)
 }
 
-get_PVTC_t <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting){
+get_PVTC_t <- function(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
+{
   pvtc_t <- as.numeric(length(age))
   for (k in 1:(length(age) - 1))
     pvtc_t[k] <-
-      c(get_PVTC(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting,age[k]))
-  return(c(pvtc_t,0))
+      c(get_PVTC(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting,age[k]))
+  return(pvtc_t)
 }
 
 ##################################################################################
@@ -446,22 +438,28 @@ get_PVTC_t <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting){
 ##################################################################################
 get_AAL <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
   age_information(ea,retire)
-  rPVFBx <- get_rPVFBx(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort)
-  pvtc <- get_PVTC_t(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
+  rPVFBx <- get_rPVFBx(ea,i,a_sgr,sgr,cola,afc,bf,mort)
+  pvtc <- as.numeric(length(age))
+  for (l in 1:(length(age) - 1))
+    pvtc[l] <-
+    c(get_PVTC(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting,age[l]))
+  pvtc <- c(pvtc,pvtc[length(pvtc)])
   
-  k <- (c(rPVFBx,rep(0,length(pvtc)-length(rPVFBx))) + pvtc)
+  k <- (rPVFBx + pvtc)
   
   if (cm == 'EAN')
     aal <-
-    k - (get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) * c(get_tla_t(ea,retire,i,sgr,mort),get_tla(ea,retire,i,sgr,mort,age[length(age)])))
+    k - (get_NC(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) * c(get_tla_t(ea,i,sgr,mort),get_tla(ea,i,sgr,mort,age[length(age)])))
   else
     aal <- k * ((yos_xy) / (age[length(age)] - age[1]))
-  return(c(aal,get_rPVFBx_after_r(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort)))
+  return(c(aal,get_xPVFBr(ea,i,a_sgr,sgr,cola,afc,bf,mort)))
 }
 
-get_aal_pop<-function(pop,ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
-  dat<-data.frame(Age=seq(ea,max_age),aal=pop*get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
-  AAL_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
+
+
+get_aal_pop<-function(pop,ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
+  dat<-data.frame(Age=seq(ea,max_age),aal=pop*get_AAL(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
+  AAL_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,max_age),include.lowest = TRUE))
   aal_sum<-sum(AAL_POP[[1]]$aal.Freq)
   for(i in 2:length(names(AAL_POP)))
     aal_sum<-c(aal_sum,sum(AAL_POP[[i]]$aal.Freq))
@@ -471,64 +469,83 @@ get_aal_pop<-function(pop,ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
 ####################################################################
 ########################## Statistics ##############################
 ####################################################################
-get_stat<-function(ea,retire,active,retirees,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
-    active_pop<-active
-    retire_pop<-retirees%>%table()
-    active_pop<-table(active_pop)
-    payroll<-c(get_act_sal(ea,retire,a_sgr)*active_pop,rep(0,length(c(active_pop,retire_pop))-length(active_pop)))
-    nc<-c(get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)*active_pop,rep(0,length(c(active_pop,retire_pop))-length(active_pop)))
-    aal<-c(active_pop,retire_pop)*get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
-    dat<-data.frame(Age=seq(ea,max_age),Payroll=payroll,"Normal Cost"=nc,AAL=aal)
-    total_payroll<-sum(payroll)
-    total_nc<-sum(nc)
-    total_aal<-sum(aal)
-    stat<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
-    stats<-NULL
-    for(j in 1:length(stat)){
-        stats<-rbind(stats,data.frame(names(stat)[j], 
-                    (sum(stat[[j]]$Payroll)/total_payroll)*100,
-                    (sum(stat[[j]]$Normal.Cost)/total_nc)*100,
-                    (sum(stat[[j]]$AAL)/total_aal)*100))
-    }
-    names(stats)<-c("Age Group","Salary/Total Salary (%)","Normal Cost/Total Normal Cost (%)","AAL/Total AAL (%)")
-    return(stats)
-}
+get_stat<-function(ea,active,retirees,median_p,median_dr,median_sgr,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting,amortization){
+active_pop<-active
+retire_pop<-retirees%>%table()
+active_pop<-table(active_pop)
+payroll<-c(get_act_sal(ea,a_sgr)*active_pop,rep(0,length(c(active_pop,retire_pop))-length(active_pop)))
+nc<-c(get_NC(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)*active_pop,rep(0,length(c(active_pop,retire_pop))-length(active_pop)))
+asset<-c(active_pop,retire_pop)*get_median_asset(ea,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
+aal<-c(active_pop,retire_pop)*get_AAL(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
+adc<-get_ARC(c(active_pop,retire_pop),ea,median_p,median_dr,median_sgr,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting,amortization)
+uaal<-(aal-asset)
+dat<-data.frame(Age=seq(ea,max_age),Payroll=payroll,"Normal Cost"=nc,Assets=asset,UAAL=uaal,
+           AAL=aal,ADC=adc)
+total_payroll<-sum(payroll)
+total_nc<-sum(nc)
+total_assets<-sum(asset)
+total_aal<-sum(aal)
+total_uaal<-sum(uaal)
+total_adc<-sum(adc)
+stat<-split(dat,cut(dat$Age,age_grp_labels(ea,max_age),include.lowest = TRUE))
+stats<-NULL
 
+for(i in 1:length(stat)){
+    stats<-rbind(stats,data.frame(names(stat)[i], 
+                sum(stat[[i]]$Payroll)/total_payroll*100,
+                sum(stat[[i]]$Normal.Cost)/total_nc*100,
+                sum(stat[[i]]$Assets)/total_assets*100,
+                sum(stat[[i]]$UAAL)/total_uaal*100,
+                sum(stat[[i]]$AAL)/total_aal*100,
+                sum(stat[[i]]$ADC)/total_adc*100))
+}
+names(stats)<-c("Age Group","Payroll (%)","Normal Cost (%)","Assets (%)","UAAL (%)","AAL (%)","ADC (%)")
+return(stats)
+}
 ##################################################################################
 ############################## NC for cost methods ##############################
 #################################################################################
 get_NC <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
   age_information(ea,retire)
-  rPVFBx <- get_rPVFBx(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort)
-  pvtc <- get_PVTC_t(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
-  exp_sal <- get_exp_sal(ea,retire,sgr)
-  k <-(rPVFBx[1] + pvtc[1]) / (exp_sal[1] * get_tla_t(ea,retire,i,sgr,mort)[1])
+  rPVFBx <- get_rPVFBx(ea,i,a_sgr,sgr,cola,afc,bf,mort)
+  
+  pvtc <- as.numeric(length(age))
+  for (l in 1:(length(age) - 1))
+    pvtc[l] <-
+    c(get_PVTC(ea,i,a_sgr,sgr,cola,afc,bf,mort,vesting,age[l]))
+  pvtc <- c(pvtc,pvtc[length(pvtc)])
+  
+  exp_sal <- get_exp_sal(ea,sgr)
+  
+  k <-
+    (rPVFBx[1] + pvtc[1]) / (exp_sal[1] * get_tla_t(ea,i,sgr,mort)[1])
+  
   if (cm == 'EAN')
     nc <- (k) * exp_sal
   else
-    nc <- ((c(rPVFBx,rep(0,length(pvtc)-length(rPVFBx))) + pvtc) / (age[length(age)] - age[1]))
+    nc <- ((rPVFBx + pvtc) / (age[length(age)] - age[1]))
+  
   return(nc)
 }
 
 
-get_nc_pop<-function(pop,ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
-  dat<-data.frame(Age=seq(ea,retire),nc=pop*get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
-  NC_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,retire),include.lowest = TRUE))
+get_nc_pop<-function(pop,ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
+  dat<-data.frame(Age=seq(ea,retire),nc=pop*get_NC(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
+  NC_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire),include.lowest = TRUE))
   nc_sum<-sum(NC_POP[[1]]$nc.Freq)
   for(i in 2:length(names(NC_POP)))
     nc_sum<-c(nc_sum,sum(NC_POP[[i]]$nc.Freq))
   return(cbind(names(NC_POP),nc_sum))
 }
-
 ###########################################################################################
 ######################## Median asset conditions ##########################################
 ###########################################################################################
 get_median_asset <-
-  function(ea,retire,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting) {
+  function(ea,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting) {
     i <- median_dr
     sgr <- median_sgr
     median_asset <-
-      median_p * get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
+      median_p * get_AAL(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
     return(median_asset)
   }
 
@@ -538,9 +555,10 @@ get_median_asset <-
 get_FR <-
   function(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
     age_information(ea,retire)
-    median_asset<-get_median_asset(ea,retire,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
-    aal<-get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
+    median_asset<-get_median_asset(ea,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
+    aal<-get_AAL(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
     fr <- sum(pop * median_asset) / sum(pop * aal)
+    
     return(fr)
   }
 
@@ -548,14 +566,16 @@ get_FR <-
 ############################### Annual Required Contribution ###################################
 ################################################################################################
 get_ARC <-
-  function(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,pgr,cola,afc,bf,cm,mort,vesting,amortization) {
+  function(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting,amortization) {
     age_information(ea,retire)
-    pop_ret<-pop[length(age)+1:(max_age-length(age)-ea+1)]
+    pop_all<-pop
     pop<-as.vector(pop)[1:length(age)]
-    nc<- get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
-    aal<-get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
-    median_asset<-get_median_asset(ea,retire, median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
-    uaal_ret<-((aal[length(age)+1:(max_age-length(age)-ea+1)]-median_asset[length(age)+1:(max_age-length(age)-ea+1)])/get_am(ea,retire,i,amortization))*pop_ret
-    arc<- c(pop * (nc + ((1/(i-pgr))*(1-((1+pgr)/(1+i)))^yos_xy)/get_am(ea,retire,i,amortization)),uaal_ret)
+    nc<- get_NC(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
+    aal<-get_AAL(ea,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
+    median_asset<-get_median_asset(ea, median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
+    aal_comp<-((pop_all * aal - pop_all * median_asset)/ sum(pop_all) * get_am(ea,i,amortization))
+    
+    
+    arc <-c((pop * nc)+aal_comp[1:length(pop)],aal_comp[(length(pop)+1):length(aal_comp)]) 
     return((arc))
   }

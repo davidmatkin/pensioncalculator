@@ -3,9 +3,10 @@
      ##################### Basic functions for Pension Simulation Calculator#################
   ################################################################################################
 ######################################################################################################
-
+library(scales)
 rm(list = ls())
-
+dollar_format(prefix = "", suffix = "$",largest_with_cents = 1e-2, big.mark = ",", negative_parens = FALSE)
+  
 
 #################################################################################################
 ########################################## Load RData ###########################################
@@ -360,7 +361,7 @@ get_replacement_rate <- function(ea,retire,a_sgr,sgr,afc,bf) {
 ################### Retirement Annuity ###########################
 get_retirement_annuity<-function(ea,retire,a_sgr,sgr,afc,bf){
   acc_benefit<-get_acc_benefit_r(ea,retire,a_sgr,sgr,afc,bf)
-  return(round(acc_benefit[length(acc_benefit)],3))
+  return(acc_benefit[length(acc_benefit)])
 }
 
 #############################################################################################
@@ -480,11 +481,20 @@ get_stat<-function(ea,retire,active,retirees,i,a_sgr,sgr,cola,afc,bf,cm,mort,ves
     aal<-c(active_pop,retire_pop)*get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
     dat<-data.frame(Age=seq(ea,max_age),Payroll=payroll,"Normal Cost"=nc,AAL=aal)
     total_payroll<-sum(payroll)
+    
     total_nc<-sum(nc)
+    
     total_aal<-sum(aal)
-    stat<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
+  stat<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
     stats<-NULL
     for(j in 1:length(stat)){
+      if(grepl('\\(',names(stat)[j])){
+        num<-as.numeric(substr(x = names(stat)[j],2,3))
+        names(stat)[j]<-gsub(num,num+1,names(stat)[j])
+        }
+      names(stat)[j]<-gsub(',','-',names(stat)[j])
+      names(stat)[j]<-gsub('\\(','\\[',names(stat)[j])
+      
         stats<-rbind(stats,data.frame(names(stat)[j], 
                     (sum(stat[[j]]$Payroll)/total_payroll)*100,
                     (sum(stat[[j]]$Normal.Cost)/total_nc)*100,
@@ -494,6 +504,29 @@ get_stat<-function(ea,retire,active,retirees,i,a_sgr,sgr,cola,afc,bf,cm,mort,ves
     return(stats)
 }
 
+
+get_summary<-function(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,pgr,cola,afc,bf,cm,mort,vesting,amortization){
+  percent<-percent(median_p)
+  total_aal<-sum(pop*get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
+  total_nc<-sum(get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)*pop[1:length(age)])
+  total_assets<-sum(pop*get_median_asset(ea,retire,median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting))
+  total_uaal<-total_aal-total_assets
+  total_adc<-sum(get_ARC(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,pgr,cola,afc,bf,cm,mort,vesting,amortization))
+  payroll<-sum(get_act_sal(ea,retire,a_sgr)*pop[1:length(age)])
+  nc_pay<-percent(total_nc/payroll)
+  uaal_pay<-percent(total_uaal/payroll)
+  arc_pay<-percent(total_adc/payroll)
+  total_aal<-dollar(total_aal)
+  total_nc<-dollar(total_nc)
+  total_uaal<-dollar(total_uaal)
+  total_adc<-dollar(total_adc)
+  sum_elem<-c("Funding Ratio","Total AAL","Total Normal Cost","Total UAAL","Total ADC","NC/Payroll","UAAL/Payroll","ARC/Payroll")
+  sum_val<-c(percent,total_aal,total_nc,total_uaal,total_adc,nc_pay,uaal_pay,arc_pay)
+  summary<-cbind(sum_elem,sum_val)
+  names(summary)<-c("Plan Costs","Estimate")
+  return(summary)
+}
+  
 ##################################################################################
 ############################## NC for cost methods ##############################
 #################################################################################

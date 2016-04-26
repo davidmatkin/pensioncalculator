@@ -26,14 +26,20 @@ amortization<-30
 vesting<-5
 cm<-'EAN'
 median_p<-0.854
+
+
+
 median_dr<-0.08
 median_sgr<-0.0568
 
 pop<-rep(1,71)
 
 
+
 afc<-5
 retire<-65
+
+
 
 get_qxt(ea,retire)
 
@@ -59,8 +65,9 @@ active<-seq(30,65)
 
 pgr<-sgr-inflation
 
+
 retirees<-seq(66,100)
-ea<-25
+ea<-30
 sum(get_ARC(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,pgr,cola,afc,bf,cm,mort,vesting,amortization))
 
 get_FR(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)

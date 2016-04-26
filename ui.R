@@ -1,5 +1,4 @@
 library(shiny)
-library(shinydashboard)
 library(shinythemes)
 library(plotly)
 rm(list = ls())
@@ -47,8 +46,6 @@ shinyUI(fluidPage(
       'Population & Plan Features',
       column(
         3,
-        absolutePanel(id="sidebar",
-          top = 20,left = 20,draggable = FALSE,
           wellPanel(
             h3('Who Participates in the Plan?'),br(),
             
@@ -77,8 +74,11 @@ shinyUI(fluidPage(
             )
             
             
-          )
+          ))
           ,
+        column(
+          3,
+          
           wellPanel(
             h3('The Retirement Plan Benefits'),br(),
             numericInput("benefit_factor", "Benefit Factor (%) - Sometimes called the generosity factor",2,step = 0.25,min = 0),
@@ -98,11 +98,10 @@ shinyUI(fluidPage(
             br(),HTML('<b>The total liability for someone who just retired ($)</b>'),
             textOutput('pv_annuity')
           )
-        )
         
       ),
       
-      column(9,br(),br(),
+      column(6,br(),br(),
              div(
                HTML('<center><h2>Age Distribution for Current Workers and Retirees</h2></center>'),
                plotlyOutput("pop")
@@ -114,18 +113,12 @@ shinyUI(fluidPage(
         3,
         wellPanel(
           selectInput("cost_method","The actuarial cost method (most governments use EAN - Entry Age Normal)",choices = c("EAN","PUC")),
-#           sliderInput(
-#             "inflation_rate", "Select inflation rate",min = 2,max = 4,value = 2,step = 0.25
-#           ),
-#           
-          # uiOutput('discount_rate')
           sliderInput(
             "discount_rate", "What is the expected rate of return on the plan's assets? (the discount rate)",min = 2, max = 7,value =6,step = 0.25)
           ,
           br(),
-          #uiOutput('salary_rate')
           sliderInput(
-            "sal_growth_rate", "What is the expected salary growth rate? (including  cost of living, productivity, and merit increases)",min = 2,max = 6,value =
+            "sal_growth_rate", "What is the expected salary growth rate? (including cost of living, productivity, and merit increases)",min = 2,max = 6,value =
               3.68,step = 0.25),
           
           br(),
@@ -145,7 +138,7 @@ shinyUI(fluidPage(
       column(
         4,
         br(),
-        HTML("<center><h5>This figure show the growth in how much money needs to be set aside every year, in dollar amounts, to cover one employee's retirement benefit</h5></center>"),
+        HTML("<center><h5>This figure shows the growth in how much money needs to be set aside every year, in dollar amounts, to cover one employee's retirement benefit</h5></center>"),
         plotlyOutput('nc'),br(),
         textOutput('total_nc'),br(),br(),
         HTML("<center><h5>This figure shows the growth in a single employee's liabilty, in dollar amounts, and the decline in that liability through retirement</h5></center>"),
@@ -155,7 +148,7 @@ shinyUI(fluidPage(
       column(
         4,
         br(),
-        HTML("<center><h5>This figure show the growth in how much money needs to be set aside every year, as a portion of salary, to cover one employee's retirement benefit</h5></center>"),
+        HTML("<center><h5>This figure shows the growth in how much money needs to be set aside every year, as a portion of salary, to cover one employee's retirement benefit</h5></center>"),
         plotlyOutput('nc_payroll'),br(),br(),br(),br(),
         
         HTML("<center><h5>This figure shows the growth in a single employee's liability, as a portion of salary, from the year they begin work to when they retire</h5></center>"),
@@ -177,47 +170,16 @@ shinyUI(fluidPage(
                sliderInput(
                  "percent", "What is the plan's funding ratio? (What is the value of the plan assets that are set aside to cover the liability?)",min = 0,max = 100,value = 85.4,step = 0.01
                )
-              ),
-             h3('Summary'),
-             textOutput('summ_funding_ratio'), br(),
-             textOutput('summ_AAL'), br(),
-             textOutput('summ_total_nc'), br(),
-             textOutput('summ_total_UAAL'), br(),
-             textOutput('summ_adc'), br(),
-             textOutput('summ_nc_pr'), br(),
-             textOutput('summ_UAAL_pr'), br(),
-             textOutput('summ_adc_pr'), br()
-             
-#              HTML('<center><h4>Normal Cost</h4></center>'),
-#              plotlyOutput('nc_pie_pop'),
-#              HTML('<center><h4>AAL</h4></center>'),
-#              plotlyOutput('aal_pie_pop')
-#              
-      ),
+              )
+             ),
       column(
-        8,br(),br(),
-        HTML('<center><h4>The share of costs, liabilities, and assets by age group</h4></center>'),br(),br(),
+        8,align="center",br(),br(),
+        HTML('<center><h3>Summary</center>'),
+        tableOutput('summary'), br(),
+        HTML('<center><h3>The share of costs, liabilities, and assets by age group</h3></center>'),br(),
         tableOutput('stats')
-#         column(
-#           6,br(),br(),
-#           HTML('<center><h4>Normal Cost</h4></center>'),
-#           plotlyOutput('nc_pop'),
-#           textOutput('total_nc_pop')),
-#         column(
-#           6,br(),br(),
-#           HTML('<center><h4>AAL</h4></center>'),
-#           plotlyOutput('aal_pop'),
-#           textOutput('total_aal_pop'))
-#           
         )
         
-      ,
-      
-      absolutePanel(top = 800,left = 500,tags$footer(
-        tags$i(
-          "* These line graphs represent the normal costs and AAL for the population from hire to retirement"
-        )
-      ))
     ),
     navbarMenu(
       'Sensitivity tests',

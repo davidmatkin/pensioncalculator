@@ -1,8 +1,6 @@
-library(ggplot2)
 library(plotly)
-library(graphics)
 library(BayesBridge)
-library(shinyjs)
+library(scales)
 
 rm(list = ls())
 
@@ -12,6 +10,9 @@ shinyServer(function(input,output,clientData,session) {
   
   max_age <<- 100
   inflation<<-2
+  
+  dollar_format(prefix = "", suffix = "$",largest_with_cents = 1e-2, big.mark = ",", negative_parens = FALSE)
+  
   
   output$ui <- renderUI({
     sliderInput(
@@ -44,13 +45,13 @@ shinyServer(function(input,output,clientData,session) {
     renderText(paste("* ARC for actual salary growth rate of ",sgr()," %"))
   
   output$retire_annuity <-
-    renderText({get_retirement_annuity(input$ea,input$retire,a_sgr()/100,sgr()/100,input$afc,input$benefit_factor/100)*salary_at_retire()})
+    renderText({dollar(get_retirement_annuity(input$ea,input$retire,a_sgr()/100,sgr()/100,input$afc,input$benefit_factor/100)*salary_at_retire())})
   
   output$replace_rate <-
-    renderText({get_replacement_rate(input$ea,input$retire,a_sgr()/100,sgr()/100,input$afc,input$benefit_factor/100)})
+    renderText({percent(get_replacement_rate(input$ea,input$retire,a_sgr()/100,sgr()/100,input$afc,input$benefit_factor/100)/100)})
   
   output$pv_annuity<-renderText({
-    round(get_rPVFBx_after_r(input$ea,input$retire,drate()/100,a_sgr()/100,sgr()/100,input$cola/100,input$afc,input$benefit_factor/100,mort_tab())[2]*salary_at_retire(),2)
+    dollar(round(get_rPVFBx_after_r(input$ea,input$retire,drate()/100,a_sgr()/100,sgr()/100,input$cola/100,input$afc,input$benefit_factor/100,mort_tab())[2]*salary_at_retire(),2))
       })
   
   ########################### proportion Population code ###############################################
@@ -89,19 +90,8 @@ shinyServer(function(input,output,clientData,session) {
     })
   
   salary_at_retire<-reactive({get_sal_65(input$ea,input$retire,input$sal_in_ea,inflation,sgr())[length(age)]})
-  output$salary_at_retire <- renderText({salary_at_retire()})
-  
-#   observe({
-#     inflate <- inflation
-#     updateSliderInput(
-#       session,"discount_rate","Select real rate of return",min = inflate, max = (9 - inflate),value = 8 -
-#         inflate, step = 0.25
-#     )
-#     updateSliderInput(
-#       session,"sal_growth_rate", "Select merit based salary growth rate",min = inflate,max = (8 - inflate),value = (5.68 - inflate),step = 0.25
-#     )
-#   })
-  
+  output$salary_at_retire <- renderText({dollar(salary_at_retire())})
+
 
   ################################## Mortality tables ########################################
   mort_tab <- reactive({
@@ -155,7 +145,7 @@ shinyServer(function(input,output,clientData,session) {
   })
   
   output$total_nc <- renderText({
-    paste("Normal cost: ", round(sum(nc()),3), "$")
+    paste("Normal cost: ", dollar(round(sum(nc()),3)))
   })
 
   output$nc_pop <- renderPlotly({
@@ -238,7 +228,7 @@ shinyServer(function(input,output,clientData,session) {
   })
   
   output$total_aal <- renderText({
-    paste("Actuarial Accrued Liability: ", round(sum(aal()),3), "$")
+    paste("Actuarial Accrued Liability: ", dollar(round(sum(aal()),3)))
   })
   
   output$aal_pop <- renderPlotly({
@@ -310,15 +300,25 @@ shinyServer(function(input,output,clientData,session) {
   })
   
   ############################# Summary ######################################
-  output$summ_funding_ratio<- renderText(paste0("Funding Ratio:   ",input$percent,"%"))
-  output$summ_AAL<-renderText(paste0("Total AAL:   ",round(total_aal_pop(),3),"$"))
-  output$summ_total_nc<-renderText(paste0("Total Normal Cost:   ",round(sum(total_nc_pop()),3),"$"))
-  output$summ_total_UAAL<-renderText(paste0("Total UAAL:  ",round(total_uaal_pop(),3),"$"))
-  output$summ_adc<-renderText(paste0("Total ADC:  ",round(total_ARC(),3),"$"))
-  output$summ_nc_pr<-renderText(paste0("NC/Payroll:   ",round(total_nc_pop()/total_pay()*100,3),"%"))
-  output$summ_UAAL_pr<-renderText(paste0("UAAL/Payroll:   ",round(total_uaal_pop()/total_pay()*100,3),"%"))
-  output$summ_adc_pr<-renderText(paste0("ARC/Payroll:   ",round(total_ARC()/total_pay()*100,3),"%"))
   
+# percent<-data.frame("Funding Ratio:   ",percent(reactive({input$percent})))
+# 
+# summary<-rbind(percent(),data.frame("Total AAL:   ",dollar(round(total_aal_pop(),3))))
+# summary<-rbind(summary(),data.frame("Total Normal Cost:   ",dollar(round(sum(total_nc_pop()),3))))
+# summary<-rbind(summary(),data.frame("Total UAAL:  ",dollar(round(total_uaal_pop(),3))))
+# summary<-rbind(summary(),data.frame("Total ADC:  ",dollar(round(total_ARC(),3))))
+# summary<-rbind(summary(),data.frame("NC/Payroll:   ",percent(round(total_nc_pop()/total_pay()*100))))
+# summary<-rbind(summary(),data.frame("UAAL/Payroll:   ",percent(round(total_uaal_pop()/total_pay()*100))))
+# summary<-rbind(summary(),data.frame("ARC/Payroll:   ",percent(round(total_ARC()/total_pay()*100,3))))
+#   
+  output$summary<- renderTable({
+    get_summary(pop=table(c(populate(),populate_retirees())),
+                ea=input$ea,retire=input$retire,median_p=input$percent/100,median_dr=median_dr()/100,median_sgr=median_sgr()/100,
+                i=drate()/100,a_sgr=a_sgr()/100,sgr=sgr()/100,pgr=payroll_gr()/100,cola=input$cola/100,afc=input$afc,bf=input$benefit_factor/100,
+                cm=input$cost_method,mort=mort_tab(),vesting=input$vest,amortization=input$amort)
+
+  })
+    
   
   ##############################################################################
   ############################ Discount Rate ##################################

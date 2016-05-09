@@ -187,9 +187,9 @@ shinyUI(fluidPage(
         'Discount Rate', br(),
         HTML('<center><h4>Discount Rate</h4></center>'),
         br(),
-        column(6,
+        column(6,align="center","This figure illustrates how the funding ratio will change if the discount rate is increased or decreased",
                plotlyOutput('fr_dr')),
-        column(6,
+        column(6,align="center", "This figure illustrates how the contribution rate (as a share of payroll) will change if the discount rate is increased or decreased",
                plotlyOutput('arc_dr')),
         
         absolutePanel(top = 630,left = 500,tags$footer(textOutput("asgr_disp_fr")))
@@ -200,9 +200,9 @@ shinyUI(fluidPage(
         'Salary Growth Rate', br(),
         HTML('<center><h4>Salary Growth Rate</h4></center>'),
         br(),
-        column(6,
+        column(6,align="center", "This figure illustrates how the funding ratio will change if the salary growth rate is increased or decreased",
                plotlyOutput('fr_sgr')),
-        column(6,
+        column(6,align="center","This figure illustrates how the contribution rate (as a share of payroll) will change if the salary growth rate is increased or decreased",
                plotlyOutput('arc_sgr')),
         absolutePanel(top = 630,left = 500,tags$footer(textOutput("asgr_disp_arc")))
       ),

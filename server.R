@@ -37,13 +37,6 @@ shinyServer(function(input,output,clientData,session) {
   
   act_sal<-reactive({ get_act_sal(input$ea,input$retire,a_sgr()/100) })
   
-  
-  output$asgr_disp_fr <-
-    renderText(paste("* Funding Ratio for actual salary growth rate of ",sgr()," %"))
-  
-  output$asgr_disp_arc <-
-    renderText(paste("* ARC for actual salary growth rate of ",sgr()," %"))
-  
   output$retire_annuity <-
     renderText({dollar(get_retirement_annuity(input$ea,input$retire,a_sgr()/100,sgr()/100,input$afc,input$benefit_factor/100)*salary_at_retire())})
   
@@ -89,7 +82,8 @@ shinyServer(function(input,output,clientData,session) {
       sum(a[names(a) > retire])
     })
   
-  salary_at_retire<-reactive({get_sal_65(input$ea,input$retire,input$sal_in_ea,inflation,sgr())[length(age)]})
+  salary_at_retire<-reactive({get_sal_ca_ea(input$ea,input$retire,input$retire,input$sal_in_ea,inflation,sgr())})
+  
   output$salary_at_retire <- renderText({dollar(salary_at_retire())})
 
 
@@ -301,16 +295,6 @@ shinyServer(function(input,output,clientData,session) {
   
   ############################# Summary ######################################
   
-# percent<-data.frame("Funding Ratio:   ",percent(reactive({input$percent})))
-# 
-# summary<-rbind(percent(),data.frame("Total AAL:   ",dollar(round(total_aal_pop(),3))))
-# summary<-rbind(summary(),data.frame("Total Normal Cost:   ",dollar(round(sum(total_nc_pop()),3))))
-# summary<-rbind(summary(),data.frame("Total UAAL:  ",dollar(round(total_uaal_pop(),3))))
-# summary<-rbind(summary(),data.frame("Total ADC:  ",dollar(round(total_ARC(),3))))
-# summary<-rbind(summary(),data.frame("NC/Payroll:   ",percent(round(total_nc_pop()/total_pay()*100))))
-# summary<-rbind(summary(),data.frame("UAAL/Payroll:   ",percent(round(total_uaal_pop()/total_pay()*100))))
-# summary<-rbind(summary(),data.frame("ARC/Payroll:   ",percent(round(total_ARC()/total_pay()*100,3))))
-#   
   output$summary<- renderTable({
     get_summary(pop=table(c(populate(),populate_retirees())),
                 ea=input$ea,retire=input$retire,median_p=input$percent/100,median_dr=median_dr()/100,median_sgr=median_sgr()/100,
@@ -368,8 +352,7 @@ shinyServer(function(input,output,clientData,session) {
             x = median_dr(),y = input$percent,
             text = 'Median Asset Condition', xref = 'Discount Rate (%)', yref =
               'Funding Ratio (%)', ax = 50, ay=-100
-          ),
-        title = "This figure illustrates how the funding ratio will change if the discount rate is increased or decreased"
+          )
       )
   })
   
@@ -425,16 +408,15 @@ shinyServer(function(input,output,clientData,session) {
               #x = input$rate,
               x = median_dr(),
               y = arc_dr_median()[1] / total_pay() * 100,text = 'Median Asset Condition', xref =
-                'Discount Rate (%)', yref = 'ARC/Payroll', ax = -50
+                'Discount Rate (%)', yref = 'ARC/Payroll', ax = -50, ay=50
             ),
             list(
               #x = input$rate,
               x = median_dr(),
               y = arc_dr_median()[2] / total_pay() * 100,text = 'Median Asset Condition', xref =
-                'Discount Rate (%)', yref = 'ARC/Payroll', ax = -50
+                'Discount Rate (%)', yref = 'ARC/Payroll', ax = -50, ay=-50
             )
-          ),
-        title = "This figure illustrates how the contribution rate (as a share of payroll) will change if the discount rate is increased or decreased"
+          )
       )
   })
   
@@ -509,8 +491,7 @@ shinyServer(function(input,output,clientData,session) {
           x = median_sgr(),y = input$percent,
           text = 'Median Asset Condition', xref = 'Salary Growth Rate %', yref =
             'Funding Ratio %', ax = 50
-        ),
-        title = "This figure illustrates how the funding ratio will change if the salary growth rate is increased or decreased."
+        )
       )
   })
   
@@ -592,9 +573,7 @@ shinyServer(function(input,output,clientData,session) {
             y = arc_sgr_median()[2] / total_pay() * 100,text = 'Median Asset Condition', xref =
               'Salary Growth Rate (%)', yref = 'ARC/Payroll', ax = -50
           )
-        ),
-        
-        title = "This figure illustrates how the contribution rate (as a share of payroll) will change if the salary growth rate is increased or decreased."
+        )
       )
   })
   
@@ -630,7 +609,7 @@ shinyServer(function(input,output,clientData,session) {
   
   output$arc_mort <- renderPlotly({
     plot_ly(
-      x = seq(2,13,1),y = (as.numeric(arc_mort('EAN')) / total_pay()) * 100,name = 'EAN',mode = 'markers+lines'
+      x = seq(2,4,6),y = (as.numeric(arc_mort('EAN')) / total_pay()) * 100,name = 'EAN',mode = 'markers+lines'
     ) %>%
       layout(
         xaxis = list(title = 'Mortality tables',ticks = 'outside'),

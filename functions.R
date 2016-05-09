@@ -1,4 +1,4 @@
-  #####################################################################################################
+#####################################################################################################
   ################################################################################################
      ##################### Basic functions for Pension Simulation Calculator#################
   ################################################################################################
@@ -21,7 +21,6 @@ load('Termination.RData')
 
 ############## Setter method for age information ###############
  age_information <<- function(i_ea,retire) {
-
   ea <<- i_ea # entry age of members,  multiple entry ages are not introduced yet
   retire <<- retire  # retirement age
   max_age <<- 100 # maximum age limit
@@ -36,14 +35,8 @@ load('Termination.RData')
 }
 
 
-age_grp_labels<<- function(i_ea,retire,age_limit){
-  start_limit<-i_ea
-  for(i in i_ea:age_limit-1){
-    if(i%%5==0)
-      start_limit<-c(start_limit,i)
-  }
-  start_limit<-c(start_limit,age_limit)
-  return(unique(start_limit))
+age_grp_labels<<- function(i_ea,age_limit){
+  return(seq(i_ea,age_limit,5))
 }
 
 #############################################################################################
@@ -68,7 +61,6 @@ generate_pop<-function(ea,retire,pop_type,pop_size,median){
           for(i in ea:retire)
             pop1<-c(pop1,rep(i,repcount))
           pop1<-pop1[pop1!=0]
-          #  pop1 <- round(runif(pop_size,min = ea-1,max = retire+1))
         }
         
     return(pop1)
@@ -97,22 +89,22 @@ population_retirees<-function(ea,retire,mort,population){
 ############## Actual Salary ############
 get_act_sal <- function(ea,retire,a_sgr) {
   age_information(ea,retire)
-  act_sal <- c((1 + a_sgr) ^ yos_xy) # actual salary at age x
-  return(act_sal)
+  # actual salary at age x
+  return(c((1 + a_sgr) ^ yos_xy))
 }
 
 ############## Expected Salary ############
 get_exp_sal <- function(ea,retire,sgr) {
   age_information(ea,retire)
-  exp_sal <- c((1 + sgr) ^ yos_xy) # actual salary at age x
-  return(exp_sal)
+  # expected salary at age x
+  return(c((1 + sgr) ^ yos_xy))
 }
 
 ############## Accumlated Salary ############
 get_acc_sal <- function(ea,retire,a_sgr) {
   act_sal <- get_act_sal(ea,retire,a_sgr)
-  acc_sal <- c(cumsum(act_sal)) #acculumated salary at age x
-  return(acc_sal)
+  #acculumated salary at age x
+  return(c(cumsum(act_sal)))
 }
 
 ############## Expected Salary at retirement ############
@@ -122,15 +114,14 @@ get_exp_sal_r <- function(ea,retire,a_sgr,sgr) {
   return(exp_sal_r)
 }
 
-##############  Salary for constant inflation rate and multiple entry ages ############
+##############  Salary for constant inflation rate for different entry ages ############
 get_sal_vector_ea <- function(ea,retire,sal,inflation,sgr){
   return((((1 + (inflation / 100)) ^ yos_xy)/(1 + ((sgr) / 100)) ^ yos_xy)*sal)
 }
 
-############## Current Salary for constant inflation rate and multiple entry ages ############
-get_sal_65 <- function(ea,retire,sal,inflation,sgr){
-  return(((1 + ((sgr) / 100)) ^ yos_xy)/((1 + (inflation / 100)) ^ yos_xy)*sal)
-  #return(sum((((1 + sgr/100) ^ (seq(ea:ca)-1))/((1 + (inflation / 100)) ^ (seq(ea:ca)-1)))*sal))
+############## Entry salary from current Salary for constant inflation rate ############
+get_sal_ca_ea<- function(ea,ca,retire,sal,inflation,sgr){
+  return(((1 + ((sgr) / 100)) ^ yos_xy[length(age)-(retire-ca)])/((1 + (inflation / 100)) ^ yos_xy[length(age)-(retire-ca)])*sal)
 }
 
 ###################################################################################################
@@ -138,7 +129,7 @@ get_sal_65 <- function(ea,retire,sal,inflation,sgr){
 ###################################################################################################
 get_mort <- function(ea,retire,mort) {
   age_information(ea,retire)
-  annuitant_mort<-(mort+1)
+  annuitant_mort<-(mort+1) #skips column for annuitants
   min_mort_age<<-18
   max_mort_age<<-120
   mortality_tab<-c(mort_tables[[mort]][(ea-min_mort_age+1):(retire-min_mort_age+1)],
@@ -261,8 +252,6 @@ get_qxt <- function(ea,retire) {
       term_rate<-c(term_rate,term_rate_xl$`Service>=10`[ea-min_qxt_age+1+i]/100)
   }
   term_rate[is.na(term_rate)]<-0
-  #term_rate_xl <- term_rate_xl[7,]
-  # rate of termination
   return(term_rate)
   
 }
@@ -449,9 +438,7 @@ get_AAL <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
   age_information(ea,retire)
   rPVFBx <- get_rPVFBx(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort)
   pvtc <- get_PVTC_t(ea,retire,i,a_sgr,sgr,cola,afc,bf,mort,vesting)
-  
   k <- (c(rPVFBx,rep(0,length(pvtc)-length(rPVFBx))) + pvtc)
-  
   if (cm == 'EAN')
     aal <-
     k - (get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) * c(get_tla_t(ea,retire,i,sgr,mort),get_tla(ea,retire,i,sgr,mort,age[length(age)])))
@@ -462,7 +449,7 @@ get_AAL <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
 
 get_aal_pop<-function(pop,ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
   dat<-data.frame(Age=seq(ea,max_age),aal=pop*get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
-  AAL_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
+  AAL_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,max_age),include.lowest = TRUE))
   aal_sum<-sum(AAL_POP[[1]]$aal.Freq)
   for(i in 2:length(names(AAL_POP)))
     aal_sum<-c(aal_sum,sum(AAL_POP[[i]]$aal.Freq))
@@ -485,7 +472,7 @@ get_stat<-function(ea,retire,active,retirees,i,a_sgr,sgr,cola,afc,bf,cm,mort,ves
     total_nc<-sum(nc)
     
     total_aal<-sum(aal)
-  stat<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,max_age),include.lowest = TRUE))
+  stat<-split(dat,cut(dat$Age,age_grp_labels(ea,max_age),include.lowest = TRUE))
     stats<-NULL
     for(j in 1:length(stat)){
       if(grepl('\\(',names(stat)[j])){
@@ -522,7 +509,7 @@ get_summary<-function(pop,ea,retire,median_p,median_dr,median_sgr,i,a_sgr,sgr,pg
   total_adc<-dollar(total_adc)
   sum_elem<-c("Funding Ratio","Total AAL","Total Normal Cost","Total UAAL","Total ADC","NC/Payroll","UAAL/Payroll","ARC/Payroll")
   sum_val<-c(percent,total_aal,total_nc,total_uaal,total_adc,nc_pay,uaal_pay,arc_pay)
-  summary<-cbind(sum_elem,sum_val)
+  summary<-as.data.frame(cbind(sum_elem,sum_val))
   names(summary)<-c("Plan Costs","Estimate")
   return(summary)
 }
@@ -546,7 +533,7 @@ get_NC <- function(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting) {
 
 get_nc_pop<-function(pop,ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting){
   dat<-data.frame(Age=seq(ea,retire),nc=pop*get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting))
-  NC_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire,retire),include.lowest = TRUE))
+  NC_POP<-split(dat,cut(dat$Age,age_grp_labels(ea,retire),include.lowest = TRUE))
   nc_sum<-sum(NC_POP[[1]]$nc.Freq)
   for(i in 2:length(names(NC_POP)))
     nc_sum<-c(nc_sum,sum(NC_POP[[i]]$nc.Freq))
@@ -585,10 +572,13 @@ get_ARC <-
     age_information(ea,retire)
     pop_ret<-pop[length(age)+1:(max_age-length(age)-ea+1)]
     pop<-as.vector(pop)[1:length(age)]
+    new_pgr<-ifelse(i-pgr<=0,0.004999,0)
     nc<- get_NC(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
     aal<-get_AAL(ea,retire,i,a_sgr,sgr,cola,afc,bf,cm,mort,vesting)
     median_asset<-get_median_asset(ea,retire, median_p,median_dr,median_sgr,a_sgr,cola,afc,bf,cm,mort,vesting)
+    uaal_pay<-sum((aal-median_asset)[1:length(age)])
     uaal_ret<-((aal[length(age)+1:(max_age-length(age)-ea+1)]-median_asset[length(age)+1:(max_age-length(age)-ea+1)])/get_am(ea,retire,i,amortization))*pop_ret
-    arc<- c(pop * (nc + ((1/(i-pgr))*(1-((1+pgr)/(1+i)))^yos_xy)/get_am(ea,retire,i,amortization)),uaal_ret)
+    pmt<-((uaal_pay/(1-((1+pgr)/(1+i))^amortization))*(i-pgr+new_pgr))*((1+pgr)^(yos_xy))
+    arc<- c(pop * (nc + ((pmt/(i-pgr+new_pgr))*(1-((1+pgr)/(1+i))^yos_xy))),uaal_ret)
     return((arc))
   }

@@ -11,7 +11,7 @@ rm(list=ls())# To remove stored objects in environment
 library(jsonlite)# to read json results from the API
 
 ########################### Setting File path ####################################
-file_path <- paste0("E://SUNYALBANY/Pension_Simulation_Project/Code/Data/")
+file_path <- paste0("ExcelData/")
 
 ######################### API QUERIES ##########################################
 api_query2<-NULL #character array for generating API queries to retrieve each dataset in PPD
@@ -50,3 +50,4 @@ amortization_period.max<-max(amortization_period$UAALAmortPeriod_GASB,na.rm=TRUE
 
 ######################## Creating Rdata files for PPD Datasets##################################
 save(pensiongasbschedules,pensiongasbassumptions,pensionincomestatement,pensionassetallocation,pensioninvestmentreturn,pensionactuarialcosts,pensionprovisions,pensionmembership,pensionreportingdates,pensioneegroupbasics,pensionplanbasics,pensiontierbasics,nationaldatappd,nationaldatacensus,ppdstatedata,pensionnormalretirementeligibility,pensionnormalretirementbenefit,pensionfinalaveragesalary,pensionbenefitcap,pensionearlyretirementeligibility,pensionearlyretirementreduction,pensionemployeecontributionrate,pensioncolabenefit,pensionretirementsystembasics,pensionfundingandmethods,pensionactuarialliabilities,pensionbenefitmin,pensionsystemdata,file = paste0(file_path, "PPD_datasets.RData"))
+

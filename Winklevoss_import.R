@@ -1,6 +1,13 @@
 ########################## winklevoss Import ##########################################
-# This program imports the following data for the actuarial valuation model
-# Decrement tables
+# This program imports the following data for the model from the winklevoss xlsx
+# Termination Rates
+# Disabled life mortality rates
+# select and ultimate Termination rates
+# disability rates
+# early retirement rates
+# Merit Salary Scale
+# hiring distribution table
+
 
 rm(list=ls())
 
@@ -12,7 +19,7 @@ cton <- function (cvar) as.numeric(gsub("[ ,$%]", "", cvar))  # character to num
 
 
 ########################### Setting File path and loading workbook ####################################
-file_path <- paste0("E://SUNYALBANY/Pension_Simulation_Project/Code/Data/")
+file_path <- paste0("ExcelData/")
 wvxl <- "Winklevoss(6).xlsx"
 wb<- XLConnect::loadWorkbook(paste0(file_path,wvxl))
 
